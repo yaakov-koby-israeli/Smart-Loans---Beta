@@ -15,6 +15,7 @@ class Users(Base):
 
 class Account(Base):
     __tablename__ = 'account'
+
     account_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     balance = Column(Float)
