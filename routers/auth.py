@@ -3,6 +3,7 @@ from http.client import HTTPException
 from typing import Annotated
 from fastapi import HTTPException
 from fastapi import APIRouter, status, Depends, Request
+from passlib.handlers.bcrypt import bcrypt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,7 @@ def get_db():
         db.close()
 
 db_dependency = Annotated[Session, Depends(get_db)]
+bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated = 'auto')
 
 # create user
 class CreateUserRequest(BaseModel):
@@ -34,7 +36,7 @@ class CreateUserRequest(BaseModel):
     email: str
     first_name: str
     last_name: str
-    hashed_password: str
+    password: str
     role: str
     public_key: str
 
@@ -48,7 +50,7 @@ async def create_user(db: db_dependency, create_user_request: CreateUserRequest)
         last_name=create_user_request.last_name,
         role=create_user_request.role,
         public_key = create_user_request.public_key,
-        hashed_password=create_user_request.hashed_password
+        hashed_password=bcrypt_context.hash(create_user_request.password) #random hash function
     )
     db.add(create_user_model)
     db.commit()
