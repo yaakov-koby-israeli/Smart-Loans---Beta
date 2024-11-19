@@ -32,5 +32,7 @@ class Loans(Base):
     duration_months = Column(Integer)
     start_date = Column(String)
     end_date = Column(String)
+    # for payment
     remaining_balance = Column(Integer)
     is_active = Column(Boolean, default=True)
+
