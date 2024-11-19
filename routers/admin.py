@@ -1,5 +1,5 @@
 from http.client import HTTPException
-from fastapi import Depends, HTTPException, status, Path, APIRouter
+from fastapi import Depends, HTTPException, status, APIRouter
 from models import Users ,Account ,Loans
 from database import SessionLocal
 from typing import Annotated
