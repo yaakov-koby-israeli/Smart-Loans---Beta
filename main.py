@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from database import engine, SessionLocal
 import models
 
-from routers import auth
+from routers import auth, admin
 
 # Create an instance of the FastAPI class
 app = FastAPI()
@@ -26,7 +26,7 @@ def root():
     return {"message": "Welcome to our Blockchain application!"}
 
 app.include_router(auth.router)
-
+app.include_router(admin.router)
 
 
 
