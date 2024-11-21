@@ -1,6 +1,8 @@
 from http.client import HTTPException
 from fastapi import Depends, HTTPException, status, APIRouter
 from pydantic import BaseModel, Field
+from web3 import Web3
+
 from models import Users ,Account ,Loans
 from database import SessionLocal
 from typing import Annotated
@@ -27,6 +29,25 @@ class SetUpAccount(BaseModel):
     is_active: bool = False
     active_loan: bool = False
 
+# connect to ganache
+ganache_url = "http://127.0.0.1:7545"
+web3 = Web3(Web3.HTTPProvider(ganache_url))
+
+def get_account_balance(user_public_key):
+    balance_wei = web3.eth.get_balance(user_public_key)
+    balance_eth = web3.from_wei(balance_wei, 'ether')
+    return balance_eth
+
+
+### End Points
+@router.get("/check-ganache", status_code=status.HTTP_200_OK)
+async def ganache_health_check(user: user_dependency, db: db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401, detail='Authenticated Failed')
+
+    return web3.is_connected()
+
+
 @router.get("/check", status_code=status.HTTP_200_OK)
 async def health_check(user: user_dependency, db: db_dependency):
     if user is None:
@@ -45,6 +66,13 @@ async def set_up_account(user: user_dependency,
 
     if user is None:
         raise HTTPException(status_code=401, detail='Authenticated Failed')
+
+    user_public_key = user.get("public_key")
+    real_account_balance_ganache = get_account_balance(user_public_key)
+
+    if account_set_up.balance > real_account_balance_ganache:
+        raise HTTPException(status_code=400,
+                            detail=f'Insufficient balance in Ganache account. Available balance: {real_account_balance_ganache} ETH')
 
     account_set_up_model = Account(**account_set_up.dict(),user_id= user.get("id"))
 
