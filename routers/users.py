@@ -38,8 +38,15 @@ async def set_up_account(user: user_dependency,
                          db:db_dependency,
                          account_set_up: SetUpAccount):
 
+    # Check if user already has an account
+    existing_account = db.query(Account).filter(Account.user_id == user.get("id")).first()
+    if existing_account:
+        raise HTTPException(status_code=400, detail='Account already exists')
+
     if user is None:
         raise HTTPException(status_code=401, detail='Authenticated Failed')
+
     account_set_up_model = Account(**account_set_up.dict(),user_id= user.get("id"))
+
     db.add(account_set_up_model)
     db.commit()
