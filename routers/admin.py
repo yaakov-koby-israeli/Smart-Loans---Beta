@@ -6,6 +6,7 @@ from typing import Annotated
 from sqlalchemy.orm import Session
 from .auth import get_current_user
 
+
 router = APIRouter(
 prefix = '/admin',
     tags=['admin']
@@ -39,4 +40,6 @@ async def readall_loans(user: user_dependency, db: db_dependency):
     if user is None  or user.get('user_role') != 'admin':
         raise HTTPException(status_code=401, detail='Authenticated Failed')
     return db.query(Loans).all()
+
+
 
