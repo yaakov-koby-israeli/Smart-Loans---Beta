@@ -1,19 +1,21 @@
 from http.client import HTTPException
 from fastapi import Depends, HTTPException, status, APIRouter
 from pydantic import BaseModel, Field
-from web3 import Web3
-
 from models import Users ,Account ,Loans
 from database import SessionLocal
 from typing import Annotated
 from sqlalchemy.orm import Session
 from .auth import get_current_user
-from main import web3
+from web3 import Web3
 
 router = APIRouter(
     prefix = '/user',
     tags=['user']
 )
+
+# connect to ganache
+ganache_url = "http://127.0.0.1:7545"
+web3_ganache = Web3(Web3.HTTPProvider(ganache_url))
 
 def get_db():
     db = SessionLocal()
@@ -30,13 +32,10 @@ class SetUpAccount(BaseModel):
     is_active: bool = False
     active_loan: bool = False
 
-
-
 def get_account_balance(user_public_key):
-    balance_wei = web3.eth.get_balance(user_public_key)
-    balance_eth = web3.from_wei(balance_wei, 'ether')
+    balance_wei = web3_ganache.eth.get_balance(user_public_key)
+    balance_eth = web3_ganache.from_wei(balance_wei, 'ether')
     return balance_eth
-
 
 ### End Points ###
 @router.get("/check-ganache", status_code=status.HTTP_200_OK)
@@ -44,7 +43,7 @@ async def ganache_health_check(user: user_dependency, db: db_dependency):
     if user is None:
         raise HTTPException(status_code=401, detail='Authenticated Failed')
 
-    return web3.is_connected()
+    return web3_ganache.is_connected()
 
 
 @router.get("/check", status_code=status.HTTP_200_OK)
