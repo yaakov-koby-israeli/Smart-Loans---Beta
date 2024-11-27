@@ -1,11 +1,8 @@
 from datetime import timedelta, datetime, timezone
 from http.client import HTTPException
 from typing import Annotated
-
-
 from fastapi import HTTPException
-from fastapi import APIRouter, status, Depends, Request
-from passlib.handlers.bcrypt import bcrypt
+from fastapi import APIRouter, status, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import SessionLocal
