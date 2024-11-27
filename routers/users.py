@@ -78,14 +78,18 @@ async def set_up_account(user: user_dependency,
     db.commit()
 
 class TransferRequest(BaseModel):
+    private_key: str
     to_account: int = Field (gt = 0, description="Please Add Recipient account ID")
-    amount: float = Field(gt=0,   description="Please Add Amount To Transfer" )
+    amount: float = Field(gt=0,  description="Please Add Amount To Transfer" )
 
 @router.post("/transfer-eth",status_code=status.HTTP_201_CREATED)
 async def transfer_eth(user: user_dependency, db: db_dependency, transfer_request: TransferRequest):
 
+    private_key = transfer_request.private_key
     to_account = transfer_request.to_account
     amount = transfer_request.amount
+
+    nonce = web3_ganache.eth.get_transaction_count(user.get("public_key"))
 
     if user is None:
         raise HTTPException(status_code=401, detail='Authenticated Failed')
@@ -101,10 +105,25 @@ async def transfer_eth(user: user_dependency, db: db_dependency, transfer_reques
 
     user_to_account = db.query(Users).filter(to_account.user_id == Users.id).first()
 
-    # Transfer ETH using Web3
-    tx_hash = web3_ganache.eth.send_transaction(
-        {'from': user.get("public_key"), 'to': user_to_account.public_key, 'value': web3_ganache.to_wei(amount, 'ether')})
-    web3_ganache.eth.wait_for_transaction_receipt(tx_hash)
+    # Create the transaction
+    transaction = {
+        'to': user_to_account.public_key,
+        'value': web3_ganache.to_wei(amount, 'ether'),  # Convert ETH to Wei
+        'gas': 21000,  # Standard gas limit for ETH transfers
+        'gasPrice': web3_ganache.to_wei(1, 'gwei'),  # Set gas price (Ganache uses low fees)
+        'nonce': nonce,
+        'chainId': 1337  # Ganache's default chain ID
+    }
+
+    # Sign the transaction with the sender's private key
+    signed_transaction = web3_ganache.eth.account.sign_transaction(transaction, private_key)
+
+    # Send the signed transaction
+    tx_hash = web3_ganache.eth.send_raw_transaction(signed_transaction.raw_transaction)
+
+    # Wait for the transaction receipt
+    tx_receipt = web3_ganache.eth.wait_for_transaction_receipt(tx_hash)
+
     from_account.balance -= amount
     to_account.balance += amount
 
@@ -112,5 +131,8 @@ async def transfer_eth(user: user_dependency, db: db_dependency, transfer_reques
     db.add(to_account)
     db.commit()
 
-    return {"message": "ETH transferred successfully", "transaction_hash": tx_hash.hex()}
+    return {"message": "ETH transferred successfully","transaction_hash" : {tx_receipt.transactionHash.hex()}}
+
+
+
 
