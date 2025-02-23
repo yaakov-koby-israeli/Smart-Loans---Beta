@@ -64,6 +64,25 @@ async def delete_user(user: user_dependency, db: db_dependency, user_id: int = P
 
     return {"message": f"User {user_id} and associated account deleted successfully"}
 
+@router.delete("/delete-loan/{loan_id}", status_code=status.HTTP_200_OK)
+async def delete_loan(user: user_dependency, db: db_dependency, loan_id: int = Path(gt=0)):
+
+    if user is None or user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Unauthorized Access")
+
+    # Fetch user and account associated with user_id
+    loan_to_delete = db.query(Loans).filter(Loans.id == loan_id).first()
+
+    if loan_to_delete is None:
+        raise HTTPException(status_code=404, detail="Loan Not Found!")
+
+
+    db.delete(loan_to_delete)
+    db.commit()
+
+    return {"message": f"Loan number {loan_id}  deleted successfully"}
+
+
 @router.put("/approve-loan/{loan_id}", status_code=status.HTTP_200_OK)
 async def approve_loan(loan_id: int, user: user_dependency, db: db_dependency, approve: bool):
     if user.get("role") != "admin":
