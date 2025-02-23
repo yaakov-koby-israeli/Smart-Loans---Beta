@@ -9,7 +9,6 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 
-
 router = APIRouter(
     prefix='/auth',
     tags=['auth']
@@ -24,7 +23,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
 
 db_dependency = Annotated[Session, Depends(get_db)]
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
@@ -83,7 +81,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Could not validate user.')
 
 
-                                                 ### **Authentication Endpoints** ###
+                                         ### **Authentication Endpoints** ###
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(db: db_dependency, create_user_request: CreateUserRequest):
