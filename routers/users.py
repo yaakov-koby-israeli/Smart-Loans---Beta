@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status, APIRouter, Path
+from fastapi import Depends, HTTPException, status, APIRouter
 from pydantic import BaseModel, Field
 from models import Users, Account, Loans
 from database import SessionLocal
@@ -62,10 +62,26 @@ async def set_up_account(user: user_dependency, db: db_dependency): # account_se
     return {"message": "Account set up successfully", "account_id": new_account.account_id, "balance": new_account.balance}
 
 
+@router.delete("/delete-account", status_code=status.HTTP_200_OK)
+async def set_up_account(user: user_dependency, db: db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401, detail='Authentication Failed')
+
+    # Check if the user already has an account
+    existing_account_to_delete = db.query(Account).filter(Account.user_id == user.get("id")).first()
+    if not existing_account_to_delete:
+        raise HTTPException(status_code=400, detail='User Dont Have an Account')
+
+    db.delete(existing_account_to_delete)
+    db.commit()  # Single commit for both operations
+
+    return {"message": "Account Deleted successfully", "user_id": user.get("id")}
+
+                                          ### transfer Eth functions ###
+
 class TransferRequest(BaseModel):
     to_account: int = Field(gt=0, description="Recipient account ID")
     amount: float = Field(gt=0, description="Amount to transfer")
-
 
 @router.post("/transfer-eth", status_code=status.HTTP_201_CREATED)
 async def transfer_eth(user: user_dependency, db: db_dependency, transfer_request: TransferRequest):
@@ -105,7 +121,8 @@ async def transfer_eth(user: user_dependency, db: db_dependency, transfer_reques
     return {"message": "ETH transferred successfully", "transaction_hash": tx_hash.hex()}
 
 
-                                        ### **Loan Management** ###
+                                            ### Loan Management ###
+
 class LoanRequest(BaseModel):
     amount: int = Field(gt=0)
     duration_months: Payments
@@ -118,6 +135,7 @@ async def request_loan(user: user_dependency, db: db_dependency, loan_request: L
         raise HTTPException(status_code=401, detail="Authentication Failed")
 
     account = db.query(Account).filter(Account.user_id == user.get("id")).first()
+
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -133,7 +151,7 @@ async def request_loan(user: user_dependency, db: db_dependency, loan_request: L
 
     # ✅ Calculate installment payments based on `Payments` enum
     num_payments = loan_request.duration_months.value
-    installment_amount = total_repayment / num_payments
+    installment_amount = total_repayment / num_payments ## --> How much loaner needs to pay every month
 
     start_date = datetime.now().strftime("%Y-%m-%d")
     end_date = (datetime.now() + timedelta(days=loan_request.duration_months.value * 30)).strftime("%Y-%m-%d")
@@ -163,172 +181,75 @@ async def request_loan(user: user_dependency, db: db_dependency, loan_request: L
         "installment_amount": installment_amount
     }
 
-# @router.post("/repay-loan/{loan_id}")
-# async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, amount: float):
-#     if user is None:
-#         raise HTTPException(status_code=401, detail="Authentication Failed")
-#
-#     # ✅ Fetch the loan
-#     loan = db.query(Loans).filter(
-#         Loans.loan_id == loan_id,
-#         Loans.status == BidStatus.APPROVED
-#     ).first()
-#
-#     if not loan:
-#         raise HTTPException(status_code=404, detail="Loan not found or not approved")
-#
-#     if amount <= 0:
-#         raise HTTPException(status_code=400, detail="Invalid repayment amount")
-#
-#     # ✅ Fetch the borrower's account
-#     account = db.query(Account).filter(Account.account_id == loan.account_id).first()
-#     if not account:
-#         raise HTTPException(status_code=404, detail="Borrower's account not found")
-#
-#     if amount > account.balance:
-#         raise HTTPException(status_code=400, detail="Insufficient balance for repayment")
-#
-#     # ✅ Deduct amount from account balance and reduce loan balance
-#     account.balance -= amount
-#     loan.remaining_balance -= amount
-#
-#     # ✅ Check if loan is fully paid
-#     if loan.remaining_balance <= 0:
-#         loan.remaining_balance = 0
-#         loan.status = BidStatus.PAID  # You might want to create a `PAID` status
-#         account.active_loan = False  # ✅ Reset active loan status
-#
-#     db.commit()
-#     db.refresh(loan)
-#     db.refresh(account)
-#
-#     return {
-#         "message": "Repayment successful",
-#         "remaining_balance": loan.remaining_balance
-#     }
-
-def sync_with_ganache(db: Session, loan: Loans, action: str):
-    """
-    Syncs loan data with the blockchain (Ganache) and updates the database accordingly.
-
-    Parameters:
-    - db: Database session
-    - loan: Loan object to be updated
-    - action: "request", "approve", "repay", or "delete"
-    """
-    borrower_account = db.query(Account).filter(Account.account_id == loan.account_id).first()
-    admin_account = db.query(Account).filter(Account.user_id == 1).first()  # Assuming admin is user_id=1
-
-    if not borrower_account or not admin_account:
-        raise HTTPException(status_code=404, detail="Account not found")
-
-    # ✅ Define blockchain transaction details
-    transaction = {
-        'from': borrower_account.user_id,  # Borrower's Ethereum address
-        'to': admin_account.user_id,  # Admin address (or loan contract)
-        'gas': 21000,
-        'gasPrice': web3_ganache.to_wei(1, 'gwei'),
-        'nonce': web3_ganache.eth.get_transaction_count(borrower_account.user_id),
-        'chainId': web3_ganache.eth.chain_id
-    }
-
-    try:
-        if action == "request":
-            # ✅ Record loan request on blockchain
-            transaction['value'] = web3_ganache.to_wei(loan.amount, 'ether')
-            tx_hash = web3_ganache.eth.send_transaction(transaction)
-
-            # ✅ Update database
-            loan.status = BidStatus.PENDING
-            borrower_account.active_loan = True
-
-        elif action == "approve":
-            # ✅ Approve loan and transfer funds
-            transaction['value'] = web3_ganache.to_wei(loan.amount, 'ether')
-            tx_hash = web3_ganache.eth.send_transaction(transaction)
-
-            # ✅ Update database
-            loan.status = BidStatus.APPROVED
-            borrower_account.balance += loan.amount  # ✅ Loan funds added to borrower's balance
-
-        elif action == "repay":
-            # ✅ Process loan repayment
-            transaction['value'] = web3_ganache.to_wei(loan.amount, 'ether')
-            tx_hash = web3_ganache.eth.send_transaction(transaction)
-
-            # ✅ Deduct amount from borrower's balance
-            borrower_account.balance -= loan.amount
-            loan.remaining_balance -= loan.amount
-            loan.remaining_payments -= 1
-
-            # ✅ If loan is fully paid, mark as completed
-            if loan.remaining_balance <= 0 or loan.remaining_payments == 0:
-                loan.remaining_balance = 0
-                loan.remaining_payments = 0
-                loan.status = BidStatus.APPROVED  # You might want to create a `PAID` status
-                borrower_account.active_loan = False
-
-        elif action == "delete":
-            # ✅ Delete loan from blockchain (could represent account closure)
-            transaction['value'] = web3_ganache.to_wei(0, 'ether')  # No ETH transfer, just a record
-            tx_hash = web3_ganache.eth.send_transaction(transaction)
-
-            # ✅ Update database
-            db.delete(loan)
-            borrower_account.active_loan = False
-
-        # ✅ Commit database changes
-        db.commit()
-        db.refresh(loan)
-        db.refresh(borrower_account)
-
-        return tx_hash.hex()
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Blockchain sync failed: {str(e)}")
+class RepayLoanRequest(BaseModel):
+    user_payment: float
 
 @router.post("/repay-loan/{loan_id}")
-async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, amount: float):
+async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, request: RepayLoanRequest):
     if user is None:
         raise HTTPException(status_code=401, detail="Authentication Failed")
 
-    loan = db.query(Loans).filter(Loans.loan_id == loan_id, Loans.status == BidStatus.APPROVED).first()
+    user_payment = request.user_payment  # ✅ Extract user_payment from request body
 
+    # ✅ Fetch the loan
+    loan = db.query(Loans).filter(Loans.loan_id == loan_id, Loans.status == BidStatus.APPROVED).first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found or not approved")
 
-    if amount <= 0:
+    if user_payment <= 0:
         raise HTTPException(status_code=400, detail="Invalid repayment amount")
 
+    # ✅ Fetch the borrower's account
     account = db.query(Account).filter(Account.account_id == loan.account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Borrower's account not found")
 
-    if amount > account.balance:
+    if user_payment > account.balance:
         raise HTTPException(status_code=400, detail="Insufficient balance for repayment")
 
-    # ✅ Deduct amount from borrower's balance
-    account.balance -= amount
-    loan.remaining_balance -= amount
-    loan.remaining_payments -= 1
+    # ✅ Fetch the admin's account (loan provider - Bank)
+    admin_account = db.query(Account).filter(Account.user_id == 1).first()
+    if not admin_account:
+        raise HTTPException(status_code=404, detail="Admin's account not found")
 
-    # ✅ If loan is fully paid, mark as completed
-    if loan.remaining_balance <= 0 or loan.remaining_payments == 0:
+    # ✅ Transfer ETH from borrower to admin using transfer_eth FIRST
+    transfer_request = TransferRequest(
+        to_account=admin_account.account_id,
+        amount=user_payment
+    )
+
+    transfer_response = await transfer_eth(user, db, transfer_request)  # Call the existing transfer function
+
+    if "transaction_hash" not in transfer_response:
+        raise HTTPException(status_code=500, detail="Loan transfer failed on the blockchain")
+
+    # ✅ Deduct amount from borrower's balance
+    account.balance -= user_payment
+    loan.remaining_balance -= user_payment
+    loan.remaining_payments -= 1  # ✅ Reduce remaining payments
+
+    # ✅ Add amount to admin's balance
+    admin_account.balance += user_payment
+
+    # ✅ Prevent negative balance
+    if loan.remaining_balance < 0:
+        loan.remaining_balance = 0
+
+    # ✅ If loan is fully paid, mark as Paid
+    if loan.remaining_balance == 0 or loan.remaining_payments <= 0:
         loan.remaining_balance = 0
         loan.remaining_payments = 0
-        loan.status = BidStatus.APPROVED
+        loan.status = BidStatus.PAID  # ✅ Loan is now fully paid
         account.active_loan = False
 
-    db.commit()
+    db.commit()  # ✅ Save changes to the database
     db.refresh(loan)
     db.refresh(account)
-
-    # ✅ Sync with blockchain and database
-    tx_hash = sync_with_ganache(db, loan, "repay")
+    db.refresh(admin_account)
 
     return {
         "message": "Repayment successful",
         "remaining_balance": loan.remaining_balance,
         "remaining_payments": loan.remaining_payments,
-        "transaction_hash": tx_hash
+        "transaction_hash": transfer_response["transaction_hash"]
     }
