@@ -228,7 +228,6 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
     )
 
     transfer_response = await transfer_eth(user, db, transfer_request)  # Call the existing transfer function
-
     if "transaction_hash" not in transfer_response:
         raise HTTPException(status_code=500, detail="Loan transfer failed on the blockchain")
 
