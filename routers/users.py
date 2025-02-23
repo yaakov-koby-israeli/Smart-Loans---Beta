@@ -31,13 +31,13 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 class SetUpAccount(BaseModel):
     balance: float
     is_active: bool = True
-    #active_loan: bool = False
+
 
 def get_account_balance(user_public_key):
     balance_wei = web3_ganache.eth.get_balance(user_public_key)
     return web3_ganache.from_wei(balance_wei, 'ether')
 
-                                                      ### **End Points** ###
+                                                  #### End Points ####
 
 @router.post("/set-up-account", status_code=status.HTTP_201_CREATED)
 async def set_up_account(user: user_dependency, db: db_dependency): # account_set_up: SetUpAccount):
@@ -127,7 +127,6 @@ class LoanRequest(BaseModel):
     amount: int = Field(gt=0)
     duration_months: Payments
     interest_rate: InterestRate
-    status: BidStatus = BidStatus.PENDING
 
 @router.post("/request-loan", status_code=status.HTTP_201_CREATED)
 async def request_loan(user: user_dependency, db: db_dependency, loan_request: LoanRequest):
@@ -151,7 +150,7 @@ async def request_loan(user: user_dependency, db: db_dependency, loan_request: L
 
     # ✅ Calculate installment payments based on `Payments` enum
     num_payments = loan_request.duration_months.value
-    installment_amount = total_repayment / num_payments ## --> How much loaner needs to pay every month
+    installment_amount = total_repayment / num_payments # --> How much loaner needs to pay every month
 
     start_date = datetime.now().strftime("%Y-%m-%d")
     end_date = (datetime.now() + timedelta(days=loan_request.duration_months.value * 30)).strftime("%Y-%m-%d")
@@ -178,7 +177,7 @@ async def request_loan(user: user_dependency, db: db_dependency, loan_request: L
         "message": "Loan request submitted successfully",
         "loan_id": new_loan.loan_id,
         "total_repayment": total_repayment,
-        "installment_amount": installment_amount
+        "installment_amount": installment_amount ## --> How much loaner needs to pay every month
     }
 
 class RepayLoanRequest(BaseModel):
@@ -193,6 +192,7 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
 
     # ✅ Fetch the loan
     loan = db.query(Loans).filter(Loans.loan_id == loan_id, Loans.status == BidStatus.APPROVED).first()
+
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found or not approved")
 
@@ -212,6 +212,15 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
     if not admin_account:
         raise HTTPException(status_code=404, detail="Admin's account not found")
 
+    # ✅ Fetch the admin User (loan provider - Bank)
+    admin_user = db.query(Users).filter(Users.id == 1).first()
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="Admin User not found")
+
+    # ✅ checking if user paid more then he needs if user
+    if not loan.remaining_balance < user_payment:
+        raise HTTPException(status_code=404, detail=f"User need to pay only {loan.remaining_balance}eth !")
+
     # ✅ Transfer ETH from borrower to admin using transfer_eth FIRST
     transfer_request = TransferRequest(
         to_account=admin_account.account_id,
@@ -223,22 +232,23 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
     if "transaction_hash" not in transfer_response:
         raise HTTPException(status_code=500, detail="Loan transfer failed on the blockchain")
 
-    # ✅ Deduct amount from borrower's balance
-    account.balance -= user_payment
+    new_user_balance = get_account_balance(user.get("public_key"))
+    new_admin_balance = get_account_balance(admin_user.public_key)
+
+    # ✅ Update Loan Details
+    account.balance = new_user_balance
     loan.remaining_balance -= user_payment
-    loan.remaining_payments -= 1  # ✅ Reduce remaining payments
 
     # ✅ Add amount to admin's balance
-    admin_account.balance += user_payment
+    admin_account.balance = new_admin_balance
 
     # ✅ Prevent negative balance
     if loan.remaining_balance < 0:
         loan.remaining_balance = 0
 
     # ✅ If loan is fully paid, mark as Paid
-    if loan.remaining_balance == 0 or loan.remaining_payments <= 0:
+    if loan.remaining_balance <= 0:
         loan.remaining_balance = 0
-        loan.remaining_payments = 0
         loan.status = BidStatus.PAID  # ✅ Loan is now fully paid
         account.active_loan = False
 
@@ -250,6 +260,5 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
     return {
         "message": "Repayment successful",
         "remaining_balance": loan.remaining_balance,
-        "remaining_payments": loan.remaining_payments,
         "transaction_hash": transfer_response["transaction_hash"]
     }
