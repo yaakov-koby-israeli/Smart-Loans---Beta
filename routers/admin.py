@@ -5,7 +5,7 @@ from typing import Annotated
 from sqlalchemy.orm import Session
 from .auth import get_current_user
 from enums import BidStatus
-from .users import TransferRequest, transfer_eth, sync_with_ganache
+from .users import TransferRequest, transfer_eth, get_account_balance
 from datetime import datetime
 
 router = APIRouter(
@@ -71,8 +71,12 @@ async def approve_loan(loan_id: int, user: user_dependency, db: db_dependency, a
 
     # ✅ Fetch the loan
     loan = db.query(Loans).filter(Loans.loan_id == loan_id, Loans.status == BidStatus.PENDING).first()
+
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found or already processed")
+
+    if loan.status != BidStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Loan is not in PENDING status")
 
     # ✅ Fetch the borrower's account
     borrower_account = db.query(Account).filter(Account.account_id == loan.account_id).first()
@@ -84,8 +88,10 @@ async def approve_loan(loan_id: int, user: user_dependency, db: db_dependency, a
     if not admin_account:
         raise HTTPException(status_code=404, detail="Admin's account not found")
 
-    if loan.status != BidStatus.PENDING:
-        raise HTTPException(status_code=400, detail="Loan is not in PENDING status")
+    # ✅ Fetch the borrower's User (loan provider)
+    borrower_profile = db.query(Users).filter(Users.id == borrower_account.user_id).first()
+    if not borrower_profile:
+        raise HTTPException(status_code=404, detail="User's profile not found")
 
     if approve:
         # ✅ Ensure admin has enough balance to transfer the loan amount
@@ -103,10 +109,13 @@ async def approve_loan(loan_id: int, user: user_dependency, db: db_dependency, a
         if "transaction_hash" not in transfer_response:
             raise HTTPException(status_code=500, detail="Loan transfer failed on the blockchain")
 
+        new_admin_balance = get_account_balance(user.get("public_key"))
+        new_borrower_balance = get_account_balance(borrower_profile.public_key)
+
         # ✅ If transfer succeeds, update database balances
         loan.status = BidStatus.APPROVED
-        borrower_account.balance += loan.amount  # ✅ Borrower receives the loan amount
-        admin_account.balance -= loan.amount  # ✅ Admin's balance decreases
+        borrower_account.balance = new_borrower_balance  # ✅ Borrower receives the loan amount
+        admin_account.balance = new_admin_balance  # ✅ Admin's balance decreases
         borrower_account.active_loan = True  # ✅ Mark borrower as having an active loan
 
         db.commit()
