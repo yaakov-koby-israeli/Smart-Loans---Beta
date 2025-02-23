@@ -160,44 +160,78 @@ async def approve_loan(loan_id: int, user: user_dependency, db: db_dependency, a
 
         return {"message": "Loan rejected and account status updated"}
 
-def check_overdue_loans(db: Session):
-    overdue_loans = db.query(Loans).filter(
-        Loans.end_date < datetime.now().strftime("%Y-%m-%d"), # Loans past due date
-        Loans.status == BidStatus.APPROVED  # Only approved loans should be checked
-    ).all()
 
-    for loan in overdue_loans:
-        account = db.query(Account).filter(Account.account_id == loan.account_id).first()
-        if not account:
-            continue  # Skip if account does not exist (should not happen)
-
-        if loan.remaining_balance > 0:  # Loan is unpaid
-            print(f"User {account.user_id} has not repaid loan {loan.loan_id}. Applying penalty.")
-
-            # ✅ Deduct 10% of the remaining balance as a penalty
-            penalty = account.balance * 0.10  # 10% penalty
-
-            # ✅ Transfer penalty money to admin's account
-            admin_account = db.query(Account).filter(Account.user_id == 1).first()  # Assuming admin ID is 1
-            if admin_account:
-                admin_account.balance += penalty  # Add penalty amount to admin
-
-            # ✅ Reduce user's balance
-            account.balance -= penalty
-            if account.balance < 0:
-                account.balance = 0  # Ensure it doesn't go negative
-
-            # ✅ Delete the user's account
-            db.delete(account)
-            db.commit()
-            print(f"User {account.user_id} account deleted after non-payment.")
-
-@router.post("/check-loan-payments")
-async def check_loans(background_tasks: BackgroundTasks, db: db_dependency, user: user_dependency):
-    if user.get("role") != "admin":
+@router.get("/admin/missed-loans", status_code=status.HTTP_200_OK)
+async def get_all_missed_loans(user: user_dependency, db: db_dependency):
+    if user is None or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admin can check overdue loans")
 
-    # ✅ Run the check in the background
-    background_tasks.add_task(check_overdue_loans, db)
+    today = datetime.now().date()
 
-    return {"message": "Overdue loan check started. Users with unpaid loans will be penalized."}
+    # ✅ Fetch all overdue loans (where end_date has passed and status is still APPROVED)
+    overdue_loans = db.query(Loans).filter(Loans.end_date < today, Loans.status == BidStatus.APPROVED).all()
+
+    if not overdue_loans:
+        return {"message": "No overdue loans found."}
+
+    # ✅ Return list of overdue loans (without punishing)
+    overdue_loans_list = []
+    for loan in overdue_loans:
+        account = db.query(Account).filter(Account.account_id == loan.account_id).first()
+        if account:
+            overdue_loans_list.append({
+                "loan_id": loan.loan_id,
+                "user_id": account.user_id,
+                "remaining_balance": loan.remaining_balance,
+                "penalty": loan.remaining_balance * 0.10,
+                "total_due": loan.remaining_balance + (loan.remaining_balance * 0.10),
+                "end_date": loan.end_date,
+                "status": loan.status.value
+            })
+
+    return {
+        "message": "List of overdue loans",
+        "overdue_loans": overdue_loans_list
+    }
+
+# def check_overdue_loans(db: Session):
+#     overdue_loans = db.query(Loans).filter(
+#         Loans.end_date < datetime.now().strftime("%Y-%m-%d"), # Loans past due date
+#         Loans.status == BidStatus.APPROVED  # Only approved loans should be checked
+#     ).all()
+#
+#     for loan in overdue_loans:
+#         account = db.query(Account).filter(Account.account_id == loan.account_id).first()
+#         if not account:
+#             continue  # Skip if account does not exist (should not happen)
+#
+#         if loan.remaining_balance > 0:  # Loan is unpaid
+#             print(f"User {account.user_id} has not repaid loan {loan.loan_id}. Applying penalty.")
+#
+#             # ✅ Deduct 10% of the remaining balance as a penalty
+#             penalty = account.balance * 0.10  # 10% penalty
+#
+#             # ✅ Transfer penalty money to admin's account
+#             admin_account = db.query(Account).filter(Account.user_id == 1).first()  # Assuming admin ID is 1
+#             if admin_account:
+#                 admin_account.balance += penalty  # Add penalty amount to admin
+#
+#             # ✅ Reduce user's balance
+#             account.balance -= penalty
+#             if account.balance < 0:
+#                 account.balance = 0  # Ensure it doesn't go negative
+#
+#             # ✅ Delete the user's account
+#             db.delete(account)
+#             db.commit()
+#             print(f"User {account.user_id} account deleted after non-payment.")
+#
+# @router.post("/check-loan-payments")
+# async def check_loans(background_tasks: BackgroundTasks, db: db_dependency, user: user_dependency):
+#     if user.get("role") != "admin":
+#         raise HTTPException(status_code=403, detail="Only admin can check overdue loans")
+#
+#     # ✅ Run the check in the background
+#     background_tasks.add_task(check_overdue_loans, db)
+#
+#     return {"message": "Overdue loan check started. Users with unpaid loans will be penalized."}
