@@ -262,3 +262,32 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
         "remaining_balance": loan.remaining_balance,
         "transaction_hash": transfer_response["transaction_hash"]
     }
+
+@router.get("/my-loan", status_code=status.HTTP_200_OK)
+async def get_my_loan(user: user_dependency, db: db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication Failed")
+
+    # ✅ Find the user's account
+    account = db.query(Account).filter(Account.user_id == user.get("id")).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="User does not have an account")
+
+    # ✅ Find the loan linked to the user's account
+    loan = db.query(Loans).filter(Loans.account_id == account.account_id).first()
+
+    if not loan:
+        raise HTTPException(status_code=404, detail="No loan found for this user")
+
+    return {
+        "loan_id": loan.loan_id,
+        "amount": loan.amount,
+        "interest_rate": loan.interest_rate.value,  # Convert Enum to value
+        "duration_months": loan.duration_months.value,  # Convert Enum to value
+        "start_date": loan.start_date,
+        "end_date": loan.end_date,
+        "remaining_balance": loan.remaining_balance,
+        "status": loan.status.value,  # Convert Enum to string
+        "borrower_active_loan": account.active_loan  # Show if borrower still has an active loan
+    }
