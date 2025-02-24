@@ -219,7 +219,7 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
         raise HTTPException(status_code=404, detail="Admin User not found")
 
     # ✅ checking if user paid more then he needs if user
-    if not loan.remaining_balance < user_payment:
+    if loan.remaining_balance < user_payment:
         raise HTTPException(status_code=404, detail=f"User need to pay only {loan.remaining_balance}eth !")
 
     # ✅ Transfer ETH from borrower to admin using transfer_eth FIRST
