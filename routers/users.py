@@ -152,8 +152,9 @@ async def request_loan(user: user_dependency, db: db_dependency, loan_request: L
     num_payments = loan_request.duration_months.value
     installment_amount = total_repayment / num_payments # --> How much loaner needs to pay every month
 
-    start_date = datetime.now().strftime("%Y-%m-%d")
-    end_date = (datetime.now() + timedelta(days=loan_request.duration_months.value * 30)).strftime("%Y-%m-%d")
+    # ✅ Change from months to minutes for testing
+    start_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    end_date = (datetime.now() + timedelta(minutes=loan_request.duration_months.value)).strftime("%Y-%m-%d %H:%M:%S")
 
     new_loan = Loans(
         account_id=account.account_id,
