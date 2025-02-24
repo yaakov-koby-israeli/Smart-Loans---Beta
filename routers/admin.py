@@ -5,8 +5,8 @@ from typing import Annotated
 from sqlalchemy.orm import Session
 from .auth import get_current_user
 from enums import BidStatus
-from .users import TransferRequest, transfer_eth, get_account_balance
-from datetime import datetime
+from .users import TransferRequest, transfer_eth, get_account_balance, web3_ganache
+from datetime import datetime, timedelta
 
 router = APIRouter(
     prefix='/admin',
@@ -131,6 +131,10 @@ async def approve_loan(loan_id: int, user: user_dependency, db: db_dependency, a
         new_admin_balance = get_account_balance(user.get("public_key"))
         new_borrower_balance = get_account_balance(borrower_profile.public_key)
 
+        # ✅ Update Loan End Time to extend from approval time
+        new_end_date = (datetime.now() + timedelta(minutes=loan.duration_months.value)).strftime("%Y-%m-%d %H:%M:%S")
+        loan.end_date = new_end_date  # ✅ Update loan end time
+
         # ✅ If transfer succeeds, update database balances
         loan.status = BidStatus.APPROVED
         borrower_account.balance = new_borrower_balance  # ✅ Borrower receives the loan amount
@@ -166,10 +170,10 @@ async def get_all_missed_loans(user: user_dependency, db: db_dependency):
     if user is None or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admin can check overdue loans")
 
-    today = datetime.now().date()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ✅ Fetch all overdue loans (where end_date has passed and status is still APPROVED)
-    overdue_loans = db.query(Loans).filter(Loans.end_date < today, Loans.status == BidStatus.APPROVED).all()
+    overdue_loans = db.query(Loans).filter(Loans.end_date < now, Loans.status == BidStatus.APPROVED).all()
 
     if not overdue_loans:
         return {"message": "No overdue loans found."}
@@ -194,44 +198,149 @@ async def get_all_missed_loans(user: user_dependency, db: db_dependency):
         "overdue_loans": overdue_loans_list
     }
 
-# def check_overdue_loans(db: Session):
-#     overdue_loans = db.query(Loans).filter(
-#         Loans.end_date < datetime.now().strftime("%Y-%m-%d"), # Loans past due date
-#         Loans.status == BidStatus.APPROVED  # Only approved loans should be checked
-#     ).all()
-#
-#     for loan in overdue_loans:
-#         account = db.query(Account).filter(Account.account_id == loan.account_id).first()
-#         if not account:
-#             continue  # Skip if account does not exist (should not happen)
-#
-#         if loan.remaining_balance > 0:  # Loan is unpaid
-#             print(f"User {account.user_id} has not repaid loan {loan.loan_id}. Applying penalty.")
-#
-#             # ✅ Deduct 10% of the remaining balance as a penalty
-#             penalty = account.balance * 0.10  # 10% penalty
-#
-#             # ✅ Transfer penalty money to admin's account
-#             admin_account = db.query(Account).filter(Account.user_id == 1).first()  # Assuming admin ID is 1
-#             if admin_account:
-#                 admin_account.balance += penalty  # Add penalty amount to admin
-#
-#             # ✅ Reduce user's balance
-#             account.balance -= penalty
-#             if account.balance < 0:
-#                 account.balance = 0  # Ensure it doesn't go negative
-#
-#             # ✅ Delete the user's account
-#             db.delete(account)
-#             db.commit()
-#             print(f"User {account.user_id} account deleted after non-payment.")
-#
-# @router.post("/check-loan-payments")
-# async def check_loans(background_tasks: BackgroundTasks, db: db_dependency, user: user_dependency):
-#     if user.get("role") != "admin":
-#         raise HTTPException(status_code=403, detail="Only admin can check overdue loans")
-#
-#     # ✅ Run the check in the background
-#     background_tasks.add_task(check_overdue_loans, db)
-#
-#     return {"message": "Overdue loan check started. Users with unpaid loans will be penalized."}
+@router.post("/admin/punish-missed-payments", status_code=status.HTTP_200_OK)
+async def punish_missed_payments(user: user_dependency, db: db_dependency):
+    if user is None or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can take actions on overdue loans")
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # ✅ Fetch all overdue loans (where end_date has passed and status is still APPROVED)
+    overdue_loans = db.query(Loans).filter(Loans.end_date < now, Loans.status == BidStatus.APPROVED).all()
+
+    if not overdue_loans:
+        return {"message": "No overdue loans found for punishment."}
+
+    # ✅ Fetch the admin's account (loan provider - Bank)
+    admin_account = db.query(Account).filter(Account.user_id == user.get("id")).first()
+    if not admin_account:
+        raise HTTPException(status_code=404, detail="Admin's account not found")
+
+    punished_loans_list = []
+
+    for loan in overdue_loans:
+        # ✅ Find the borrower's account and profile
+        current_account = db.query(Account).filter(Account.account_id == loan.account_id).first()
+        current_user_profile = db.query(Users).filter(Users.id == current_account.user_id).first() if current_account else None
+
+        if not current_account or not current_user_profile:
+            continue  # Skip if account or user profile is missing
+
+        # ✅ Update borrower's balance from blockchain
+        current_account.balance = get_account_balance(current_user_profile.public_key)
+
+        # ✅ Calculate penalty (10% of remaining balance)
+        penalty = loan.remaining_balance * 0.10
+        total_due = loan.remaining_balance + penalty
+
+        if total_due > current_account.balance:
+            # If the borrower does not have enough balance, take whatever is left
+            total_due = current_account.balance  # Take all remaining balance
+
+        # ✅ Transfer ETH from borrower to admin using transfer_eth
+        transfer_request = TransferRequest(
+            to_account=admin_account.account_id,
+            amount=total_due
+        )
+
+        transfer_response = await secure_transfer_to_admin(current_user_profile, db, transfer_request)
+
+        if "transaction_hash" not in transfer_response:
+            continue  # Skip this loan if blockchain transfer fails
+
+        # ✅ Update borrower's and admin's balances from blockchain
+        current_account.balance = get_account_balance(current_user_profile.public_key)
+        admin_account.balance = get_account_balance(user.get("public_key"))
+
+        # ✅ Mark loan as paid
+        loan.remaining_balance = 0
+        loan.remaining_payments = 0
+        loan.status = BidStatus.PAID
+        current_account.active_loan = False
+
+        # ✅ Store details of the punished loan
+        punished_loans_list.append({
+            "loan_id": loan.loan_id,
+            "user_id": current_account.user_id,
+            "original_due": loan.remaining_balance,
+            "penalty": penalty,
+            "total_deducted": total_due,
+            "transaction_hash": transfer_response["transaction_hash"],
+            "updated_borrower_balance": current_account.balance,  # ✅ Updated from blockchain
+            "updated_admin_balance": admin_account.balance  # ✅ Updated from blockchain
+        })
+
+    db.commit()
+    db.refresh(admin_account)
+
+    return {
+        "message": "Overdue loans punished successfully.",
+        "punished_loans": punished_loans_list
+    }
+
+async def secure_transfer_to_admin(user: user_dependency, db: db_dependency, transfer_request: TransferRequest):
+    """
+    Securely transfers ETH from the current user to the admin.
+
+    Parameters:
+    - `user`: The authenticated user (dict with `id` and `public_key`).
+    - `db`: Database session.
+    - `transfer_request`: Contains `amount` (ETH to transfer).
+
+    Returns:
+    - A dict with transaction details if successful.
+    """
+
+    # ✅ Fetch the sender's account (current user)
+    sender_account = db.query(Account).filter(Account.user_id == user.id).first()
+
+    if not sender_account:
+        raise HTTPException(status_code=404, detail="Your account not found")
+
+    # ✅ Fetch the admin's account (loan provider)
+    admin_account = db.query(Account).filter(Account.user_id == 1).first()  # Assuming user_id=1 is admin
+    if not admin_account:
+        raise HTTPException(status_code=404, detail="Admin's account not found")
+
+    # ✅ Fetch the admin's user profile
+    admin_profile = db.query(Users).filter(Users.id == admin_account.user_id).first()
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Admin's profile not found")
+
+    # ✅ Update sender's balance from blockchain
+    sender_account.balance = get_account_balance(user.public_key)
+
+    # ✅ Prepare blockchain transaction (Transfer from USER to ADMIN)
+    transaction = {
+        'from': user.public_key,  # ✅ Sender's Ethereum address
+        'to': admin_profile.public_key,  # ✅ Admin's Ethereum address
+        'value': web3_ganache.to_wei(transfer_request.amount, 'ether'),  # Convert ETH to Wei
+        'gas': 21000,
+        'gasPrice': web3_ganache.to_wei(1, 'gwei'),
+        'nonce': web3_ganache.eth.get_transaction_count(user.public_key),
+        'chainId': web3_ganache.eth.chain_id
+    }
+
+    try:
+        # ✅ Send the transaction
+        tx_hash = web3_ganache.eth.send_transaction(transaction)
+        web3_ganache.eth.wait_for_transaction_receipt(tx_hash)
+
+        # ✅ Update sender's and admin's balances from blockchain (AFTER transfer)
+        sender_account.balance = get_account_balance(user.public_key)
+        admin_account.balance = get_account_balance(admin_profile.public_key)
+
+        # ✅ Commit changes to database
+        db.commit()
+        db.refresh(sender_account)
+        db.refresh(admin_account)
+
+        return {
+            "message": "ETH transferred successfully from user to admin",
+            "transaction_hash": tx_hash.hex(),
+            "user_new_balance": sender_account.balance,
+            "admin_new_balance": admin_account.balance
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Blockchain transfer failed: {str(e)}")
