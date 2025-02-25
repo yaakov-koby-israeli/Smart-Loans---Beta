@@ -119,9 +119,8 @@ The platform allows the bank to approve, delete, and manage user accounts and lo
     width="40" 
     height="40" 
     title="Sqlite" 
-  />
-   
-  />    
+  /> 
+    
 <div/>  
 
 ---
