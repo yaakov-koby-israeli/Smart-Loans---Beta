@@ -94,13 +94,9 @@ The platform allows the bank to approve, delete, and manage user accounts and lo
 
 ## Future Enhancements
 
-- **Multi-Chain Support**: Expand to support multiple blockchain networks.
+- **Font end**: Expand to program to have friendly user interface.
 - **AI-Powered Credit Scoring**: Implement AI-driven risk assessment models.
-
-## Author
-
-Developed by **Yaakov Koby Israeli**.
-
+ 
 ---
 
 **Feel free to contribute, report issues, or fork the project! 🚀**
