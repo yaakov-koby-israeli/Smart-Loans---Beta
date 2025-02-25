@@ -2,23 +2,22 @@
 
 ## Overview
 
-Smart Loans - Beta is a decentralized, blockchain-powered lending system that provides a secure, transparent, and automated way to manage loans. The system leverages **FastAPI**, **SQLAlchemy**, and **Ethereum smart contracts** to enable seamless financial transactions between borrowers and lenders without intermediaries.
+Smart Loans - Beta is a decentralized lending system that provides a secure, transparent, and automated way to manage loans. The system leverages **FastAPI**, **SQLAlchemy**, and **Web3.py** to enable seamless financial transactions between borrowers and lenders while integrating with blockchain for transaction security.
 
 ## Features
 
 - **User Authentication**: Secure login with JWT-based authentication and hashed passwords.
 - **Role-Based Access**: Admin, lenders, and borrowers have different permissions.
 - **Loan Management**: Loan requests, approvals, repayments, and overdue penalties.
-- **Blockchain Security**: Transactions are executed via Ethereum smart contracts.
-- **Automated Payments**: Loan repayments and penalties are enforced using smart contracts.
+- **Blockchain Integration**: Transactions are executed using Web3 with Ganache for Ethereum simulation.
+- **Automated Payments**: Loan repayments and penalties are enforced using on-chain transactions.
 - **FastAPI-Based Backend**: High-performance API using FastAPI and SQLAlchemy.
-- **Web3 Integration**: Blockchain transactions executed via Ganache Ethereum simulation.
 
 ## Tech Stack
 
 - **Backend**: FastAPI (Python)
 - **Database**: SQLAlchemy + SQLite/PostgreSQL
-- **Blockchain**: Ethereum (Web3.py, Solidity smart contracts)
+- **Blockchain Integration**: Web3.py (Ganache Ethereum simulation)
 - **Security**: JWT authentication, password hashing, role-based access control
 
 ## Project Structure
@@ -32,7 +31,6 @@ Smart Loans - Beta is a decentralized, blockchain-powered lending system that pr
 │   ├── auth.py       # User authentication (JWT, login, registration)
 │   ├── admin.py      # Admin functionalities (approve loans, delete users, punish overdue loans)
 │   ├── users.py      # Loan requests, repayments, ETH transfers
-│── contracts/        # Solidity smart contracts
 │── enums.py          # Enum definitions for interest rates, payments, and bid status
 ```
 
@@ -56,32 +54,33 @@ Smart Loans - Beta is a decentralized, blockchain-powered lending system that pr
    ```sh
    uvicorn main:app --reload
    ```
+
 ## API Endpoints
 
 ### Authentication
 
-- **POST **`` - Register a new user
-- **POST **`` - Authenticate user and generate JWT token
+- **POST `/auth/`** - Register a new user
+- **POST `/auth/token`** - Authenticate user and generate JWT token
 
 ### Admin Functions
 
-- **GET **`` - View all registered users
-- **GET **`` - View all accounts
-- **GET **`` - View all loan records
-- **DELETE **`` - Delete a user
-- **DELETE **`` - Delete a loan
-- **PUT **`` - Approve or reject a loan
-- **GET **`` - Get all overdue loans
-- **POST **`` - Enforce penalties on overdue loans
+- **GET `/admin/users`** - View all registered users
+- **GET `/admin/accounts`** - View all accounts
+- **GET `/admin/loans`** - View all loan records
+- **DELETE `/admin/delete-user/{user_id}`** - Delete a user
+- **DELETE `/admin/delete-loan/{loan_id}`** - Delete a loan
+- **PUT `/admin/approve-loan/{loan_id}`** - Approve or reject a loan
+- **GET `/admin/missed-loans`** - Get all overdue loans
+- **POST `/admin/punish-missed-payments`** - Enforce penalties on overdue loans
 
 ### User Functions
 
-- **POST **`` - Create a blockchain-linked account
-- **DELETE **`` - Delete an account
-- **POST **`` - Transfer ETH between users
-- **POST **`` - Request a loan
-- **POST **`` - Repay a loan
-- **GET **`` - View current loan status
+- **POST `/user/set-up-account`** - Create a blockchain-linked account
+- **DELETE `/user/delete-account`** - Delete an account
+- **POST `/user/transfer-eth`** - Transfer ETH between users
+- **POST `/user/request-loan`** - Request a loan
+- **POST `/user/repay-loan/{loan_id}`** - Repay a loan
+- **GET `/user/my-loan`** - View current loan status
 
 ## Security Measures
 
@@ -92,7 +91,6 @@ Smart Loans - Beta is a decentralized, blockchain-powered lending system that pr
 
 ## Future Enhancements
 
-- **NFT-Based Loan Collateral**: Use NFTs as collateral for loans.
 - **Multi-Chain Support**: Expand to support multiple blockchain networks.
 - **AI-Powered Credit Scoring**: Implement AI-driven risk assessment models.
 
@@ -103,6 +101,8 @@ Developed by **Yaakov Koby Israeli**.
 ---
 
 **Feel free to contribute, report issues, or fork the project! 🚀**
+
+
 
 
 
