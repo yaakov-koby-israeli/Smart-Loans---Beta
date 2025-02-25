@@ -96,7 +96,34 @@ The platform allows the bank to approve, delete, and manage user accounts and lo
 
 - **Font end**: Expand to program to have friendly user interface.
 - **AI-Powered Credit Scoring**: Implement AI-driven risk assessment models.
- 
+
+## :hammer_and_wrench: Languages and Tools :
+<div>
+  <img 
+    src="https://cdn.freebiesupply.com/logos/large/2x/python-5-logo-png-transparent.png" 
+    alt="python picture" 
+    width="40" 
+    height="40" 
+    title="Python" 
+  />
+  <img 
+    src="https://withcodeexample.com/wp-content/uploads/2025/01/getting-started-with-python-fastapi-a-comprehensive-guide-image.jpg" 
+    alt="Python Fast-api" 
+    width="40" 
+    height="40" 
+    title="Python Fast-api" 
+  />
+  <img 
+    src="https://icon-icons.com/icons2/2699/PNG/512/sqlite_logo_icon_169724.png" 
+    alt="Sqlite" 
+    width="40" 
+    height="40" 
+    title="Sqlite" 
+  />
+   
+  />    
+<div/>  
+
 ---
 
 **Feel free to contribute, report issues, or fork the project! 🚀**
