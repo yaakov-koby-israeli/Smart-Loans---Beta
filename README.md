@@ -100,10 +100,11 @@ The platform allows the bank to approve, delete, and manage user accounts and lo
 ## 🛠️ Languages and Tools:
 
 <p align="left">
+   <img src="https://pbs.twimg.com/profile_images/1786389425678663680/zlm8fLps_400x400.png" title="PyCharm" alt="PyCharm" width="50" height="50"/>
+   <img src="https://upload.wikimedia.org/wikipedia/commons/9/97/Sqlite-square-icon.svg" title="Sqlite" alt="Sqlite" width="50" height="50"/>
   <img src="https://cdn.freebiesupply.com/logos/large/2x/python-5-logo-png-transparent.png" alt="Python" width="40" height="40"/>
   <img src="https://icon.icepanel.io/Technology/svg/FastAPI.svg" alt="FastAPI" width="40" height="40"/>
-  <img src="https://pbs.twimg.com/profile_images/1786389425678663680/zlm8fLps_400x400.png" title="PyCharm" alt="PyCharm" width="50" height="50"/>&nbsp; 
-  <img src="https://upload.wikimedia.org/wikipedia/commons/9/97/Sqlite-square-icon.svg" title="Sqlite" alt="Sqlite" width="50" height="50"/>&nbsp;
+  
 </p>
 
 ---
