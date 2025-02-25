@@ -2,13 +2,16 @@
 
 ## Overview
 
-Smart Loans - Beta is a decentralized lending system that provides a secure, transparent, and automated way to manage loans. The system leverages **FastAPI**, **SQLAlchemy**, and **Web3.py** to enable seamless financial transactions between borrowers and lenders while integrating with blockchain for transaction security.
+Smart Loans - Beta is a decentralized banking system that uses a simulated blockchain network (Ganache) for secure and transparent transactions. The project focuses on developing the backend of the application, where the bank can manage users, loans, and approval processes, while users can transfer funds between themselves.
+
+The platform allows the bank to approve, delete, and manage user accounts and loans. Users can request loans, repay them, and transfer money between each other, all while ensuring that transactions are secure and auditable via blockchain technology.
 
 ## Features
 
 - **User Authentication**: Secure login with JWT-based authentication and hashed passwords.
 - **Role-Based Access**: Admin, lenders, and borrowers have different permissions.
 - **Loan Management**: Loan requests, approvals, repayments, and overdue penalties.
+- **User Transactions**: Users can transfer funds between accounts securely on the blockchain
 - **Blockchain Integration**: Transactions are executed using Web3 with Ganache for Ethereum simulation.
 - **Automated Payments**: Loan repayments and penalties are enforced using on-chain transactions.
 - **FastAPI-Based Backend**: High-performance API using FastAPI and SQLAlchemy.
