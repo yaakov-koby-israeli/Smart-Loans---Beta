@@ -103,7 +103,8 @@ The platform allows the bank to approve, delete, and manage user accounts and lo
 <p align="left">
   <img src="https://cdn.freebiesupply.com/logos/large/2x/python-5-logo-png-transparent.png" alt="Python" width="40" height="40"/>
   <img src="https://withcodeexample.com/wp-content/uploads/2025/01/getting-started-with-python-fastapi-a-comprehensive-guide-image.jpg" alt="FastAPI" width="40" height="40"/>
-  <img src="https://icon-icons.com/icons2/2699/PNG/512/sqlite_logo_icon_169724.png" alt="SQLite" width="40" height="40"/>
+  <img src="https://pbs.twimg.com/profile_images/1786389425678663680/zlm8fLps_400x400.png" title="PyCharm" alt="PyCharm" width="50" height="50"/>&nbsp; 
+  <img src="https://upload.wikimedia.org/wikipedia/commons/9/97/Sqlite-square-icon.svg" title="Sqlite" alt="Sqlite" width="50" height="50"/>&nbsp;
 </p>
 
 ---
