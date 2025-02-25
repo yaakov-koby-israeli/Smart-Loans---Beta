@@ -56,22 +56,6 @@ Smart Loans - Beta is a decentralized, blockchain-powered lending system that pr
    ```sh
    uvicorn main:app --reload
    ```
-
-## Smart Contract Deployment
-
-1. Navigate to the `contracts/` directory and install Hardhat:
-   ```sh
-   npm install --save-dev hardhat
-   ```
-2. Compile contracts:
-   ```sh
-   npx hardhat compile
-   ```
-3. Deploy contracts to a local Ethereum network (Ganache or testnet):
-   ```sh
-   npx hardhat run scripts/deploy.js --network <network>
-   ```
-
 ## API Endpoints
 
 ### Authentication
