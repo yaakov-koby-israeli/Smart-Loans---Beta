@@ -97,7 +97,6 @@ The platform allows the bank to approve, delete, and manage user accounts and lo
 - **Font end**: Expand to program to have friendly user interface.
 - **AI-Powered Credit Scoring**: Implement AI-driven risk assessment models.
 
-## :hammer_and_wrench: Languages and Tools :
 ## 🛠️ Languages and Tools:
 
 <p align="left">
