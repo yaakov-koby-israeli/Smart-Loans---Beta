@@ -8,15 +8,15 @@ from .auth import get_current_user
 from web3 import Web3
 from datetime import datetime, timedelta
 from enums import InterestRate, BidStatus, Payments
+import os
 
 router = APIRouter(
     prefix='/user',
     tags=['user']
 )
 
-# Connect to Ganache
-ganache_url = "http://127.0.0.1:7545"
-web3_ganache = Web3(Web3.HTTPProvider(ganache_url))
+ganache_url = os.getenv("GANACHE_URL")
+web3_ganache=Web3(Web3.HTTPProvider(ganache_url))
 
 def get_db():
     db = SessionLocal()
@@ -31,7 +31,6 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 class SetUpAccount(BaseModel):
     balance: float
     is_active: bool = True
-
 
 def get_account_balance(user_public_key):
     balance_wei = web3_ganache.eth.get_balance(user_public_key)
