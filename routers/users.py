@@ -62,7 +62,7 @@ async def set_up_account(user: user_dependency, db: db_dependency): # account_se
 
 
 @router.delete("/delete-account", status_code=status.HTTP_200_OK)
-async def set_up_account(user: user_dependency, db: db_dependency):
+async def delete_account(user: user_dependency, db: db_dependency):
     if user is None:
         raise HTTPException(status_code=401, detail='Authentication Failed')
 
