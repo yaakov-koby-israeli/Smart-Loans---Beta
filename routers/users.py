@@ -188,7 +188,8 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
     if user is None:
         raise HTTPException(status_code=401, detail="Authentication Failed")
 
-    user_payment = request.user_payment  # ✅ Extract user_payment from request body
+    # ✅ Extract user_payment from request body
+    user_payment = request.user_payment
 
     # ✅ Fetch the loan
     loan = db.query(Loans).filter(Loans.loan_id == loan_id, Loans.status == BidStatus.APPROVED).first()
@@ -219,7 +220,7 @@ async def repay_loan(user: user_dependency, db: db_dependency, loan_id: int, req
 
     # ✅ checking if user paid more then he needs if user
     if loan.remaining_balance < user_payment:
-        raise HTTPException(status_code=404, detail=f"User need to pay only {loan.remaining_balance}eth !")
+        raise HTTPException(status_code=400, detail=f"User need to pay only {loan.remaining_balance}eth !")
 
     # ✅ Transfer ETH from borrower to admin using transfer_eth FIRST
     transfer_request = TransferRequest(
